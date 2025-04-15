@@ -18,3 +18,35 @@ export const connectToMongo = async () => {
     process.exit(1);
   }
 };
+
+class MongoDBService {
+  private static instance: MongoDBService;
+  private constructor() {
+    // Private constructor to prevent instantiation
+
+  }
+
+  public static getInstance(): MongoDBService {
+    if (!MongoDBService.instance) {
+      MongoDBService.instance = new MongoDBService();
+    }
+    return MongoDBService.instance;
+  }
+  public async connect() {
+    await connectToMongo();
+  }
+  public async disconnect() {
+    await mongoose.connection.close();
+    logger.info('Disconnected from MongoDB');
+  }
+  public async getConnection() {
+    return mongoose.connection;
+  }
+  
+  public async isConnected() {
+    return mongoose.connection.readyState === 1; // 1 means connected
+  }
+}
+
+const db = MongoDBService.getInstance();
+export default db;

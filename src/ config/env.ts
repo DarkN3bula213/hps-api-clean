@@ -17,10 +17,11 @@ const envSchema = z.object({
     .enum(["development", "test", "staging", "production"])
     .default("development"),
   PORT: z.coerce.number().positive().default(3000),
+  Origin: z.string().default("http://localhost:3030"),
 
   // Database configuration
     DB_HOST: z.string().default("localhost"),
-    
+
 });
 
 // Validate and export the environment configuration
