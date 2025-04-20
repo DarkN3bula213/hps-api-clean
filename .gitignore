@@ -3,6 +3,7 @@ node_modules
 
 # Dependencies
 yarn.lock
+# Uncomment below line if you want to ignore package-lock.json
 # package-lock.json
 
 # Logs

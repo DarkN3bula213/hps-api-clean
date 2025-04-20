@@ -1,25 +1,23 @@
 # Stage 1: Builder
 FROM node:20-alpine AS builder
 
-# Install pnpm
-RUN npm install -g pnpm
-
+# Remove pnpm installation
 WORKDIR /app
 
 # Copy dependency definition files
-COPY package.json pnpm-lock.yaml ./
+COPY package.json package-lock.json* ./
 
 # Install all dependencies including devDependencies
-RUN pnpm install --frozen-lockfile
+RUN npm ci
 
 # Copy the rest of the application source code
 COPY . .
 
 # Build the TypeScript code
-RUN pnpm build
+RUN npm run build
 
 # Prune dev dependencies
-RUN pnpm prune --prod
+RUN npm prune --production
 
 # Stage 2: Runner
 FROM node:20-alpine AS runner
@@ -32,7 +30,7 @@ ENV NODE_ENV production
 ENV PORT 3000
 
 # Copy necessary files from the builder stage
-COPY --from=builder /app/package.json /app/pnpm-lock.yaml ./
+COPY --from=builder /app/package.json /app/package-lock.json* ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 
