@@ -4,6 +4,4 @@ const maintRouter = Router();
 
 // health check
 
-
-
-export default  maintRouter
+export default maintRouter;

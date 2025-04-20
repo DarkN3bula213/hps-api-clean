@@ -1,17 +1,16 @@
-import express from "express";
 import cors from "cors";
+import express from "express";
 import helmet from "helmet";
 
 import { apiKeyValidator } from "./auth";
-import { errorLogger, requestLogger } from "./observibility";
 import { errorHandler } from "./herrors";
+import { configureCommonMiddleware } from "./middleware/common";
+import { errorLogger, requestLogger } from "./observibility";
+import apiRouter from "./routes";
 import { getMiddleware } from "./utils";
 
-import apiRouter from "./routes";
-import { configureCommonMiddleware } from "./middleware/common";
-
 const app = express();
-const PORT = process.env.PORT || 3000;
+const _PORT = process.env.PORT || 3000;
 
 // Security Middleware
 app.use(helmet());
@@ -20,7 +19,7 @@ app.use(
     origin: "*",
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     preflightContinue: false,
-    optionsSuccessStatus: 204
+    optionsSuccessStatus: 204,
   })
 );
 

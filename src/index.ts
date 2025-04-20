@@ -1,7 +1,7 @@
+import http from "node:http2";
+
 import { config } from "./ config/env";
 import app from "./server";
-
-import http from "node:http2";
 import logger from "./utils/logger";
 
 const port = config.get("PORT");

@@ -54,6 +54,11 @@ jobs:
           echo "Checking existence and permissions of path: ${{ secrets.HOSTINGER_APP_PATH }}"
           ssh -o StrictHostKeyChecking=no ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }} 'echo "Connection successful! Listing target directory:" && ls -la ${{ secrets.HOSTINGER_APP_PATH }}'
 
+      # This step copies the docker-compose.yml downloaded from the artifact
+      - name: Copy docker-compose.yml to server
+        run: |
+          scp -o StrictHostKeyChecking=no ./docker-compose.yml ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:${{ secrets.HOSTINGER_APP_PATH }}/docker-compose.yml
+
       - name: Deploy and Restart Service
         uses: appleboy/ssh-action@v1.0.3
         id: deploy_script
@@ -79,10 +84,6 @@ jobs:
             tar czf ${BACKUP_DIR}/${BACKUP_FILE} docker-compose.yml .env || echo "Backup created (ignoring tar exit code if .env doesn't exist)."
             echo "Backup created at ${BACKUP_DIR}/${BACKUP_FILE}"
 
-            # 2. Update docker-compose.yml (copied from artifact)
-            echo "--- Updating docker-compose.yml ---"
-            # The file will be copied by the next step
-
             # 3. Pull latest image
             echo "--- Pulling Docker Image: ${IMAGE_NAME} ---"
             docker pull $IMAGE_NAME
@@ -101,12 +102,6 @@ jobs:
             # Replace '/health' with your actual health check endpoint if you have one
             # curl --fail http://localhost:3000/health || (echo "Health check failed!" && exit 1)
             echo "--- Deployment Successful ---"
-
-      # This step copies the docker-compose.yml downloaded from the artifact
-      - name: Copy docker-compose.yml to server
-        if: always() # Run even if previous steps fail, to potentially aid rollback
-        run: |
-          scp -o StrictHostKeyChecking=no ./docker-compose.yml ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:${{ secrets.HOSTINGER_APP_PATH }}/docker-compose.yml
 
       - name: Rollback on Failure
         if: failure() && steps.deploy_script.outcome == 'failure'

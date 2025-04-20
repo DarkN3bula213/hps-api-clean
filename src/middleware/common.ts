@@ -1,8 +1,8 @@
-import express,  { type  Application } from "express";
+import compression from "compression";
 import cors from "cors";
+import express, { type Application } from "express";
 import helmet from "helmet";
 import morgan from "morgan";
-import compression from "compression";
 
 export const configureCommonMiddleware = (app: Application): void => {
   // Security middleware

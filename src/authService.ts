@@ -1,5 +1,3 @@
-
-
 import { cache } from "./cache";
 
 export async function verifyApiKey(apiKey: string): Promise<boolean> {
@@ -20,8 +18,7 @@ export async function verifyApiKey(apiKey: string): Promise<boolean> {
   //   return true;
   // }
   // Simulate a delay for the database check
- 
-  
+
   if (validKey) {
     // Cache the valid key
     await cache.set(`api-key:${apiKey}`, "valid", { EX: 3600 });

@@ -1,6 +1,7 @@
-import { Request, Response, NextFunction } from "express";
+import { NextFunction, Request, Response } from "express";
+
 import logger from "./utils/logger";
- 
+
 // Middleware to log requests and response metrics
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
   const start = Date.now();
@@ -17,15 +18,11 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
   });
 
   next();
+  return;
 }
 
 // Middleware to log errors
-export function errorLogger(
-  err: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
+export function errorLogger(err: Error, req: Request, res: Response, next: NextFunction) {
   logger.error("Error occurred", {
     message: err.message,
     stack: err.stack,
@@ -36,4 +33,3 @@ export function errorLogger(
 
   next(err);
 }
- 

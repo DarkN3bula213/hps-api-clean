@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from "express";
-import { verifyApiKey } from "./authService";
+import { NextFunction, Request, Response } from "express";
+
 import { MiddlewareError, MiddlewareFunction } from "./utils";
 
 // export function apiKeyValidator(
@@ -19,7 +19,7 @@ import { MiddlewareError, MiddlewareFunction } from "./utils";
 
 //   next();
 // }
- 
+
 export const apiKeyValidator: MiddlewareFunction = async (
   req: Request,
   res: Response,

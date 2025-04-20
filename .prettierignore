@@ -1,0 +1,32 @@
+# Build output
+dist/
+build/
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Cache directories
+.npm/
+.cache/
+
+# Generated files
+coverage/
+reports/
+
+# Misc
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~ 

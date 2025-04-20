@@ -1,5 +1,6 @@
-import winston from "winston";
 import util from "util";
+
+import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 
 // Define custom log levels and colors
@@ -11,7 +12,7 @@ const logLevels = {
     http: 3,
     verbose: 4,
     debug: 5,
-    silly: 6
+    silly: 6,
   },
   colors: {
     error: "red",
@@ -20,8 +21,8 @@ const logLevels = {
     http: "magenta",
     verbose: "cyan",
     debug: "blue",
-    silly: "grey"
-  }
+    silly: "grey",
+  },
 };
 
 // Add colors to winston
@@ -37,26 +38,22 @@ const formatObject = (param: unknown): string => {
 };
 
 // Define the custom log format
-const customFormat = winston.format.printf(
-  ({ level, message, timestamp, ...metadata }) => {
-    let msg = message;
-    // Handle potential objects in the message or metadata
-    if (typeof message === "object") {
-      msg = formatObject(message);
-    }
-
-    // Format additional metadata if it exists
-    const metaString = Object.keys(metadata).length
-      ? formatObject(metadata)
-      : "";
-
-    // Combine message and metadata
-    const fullMessage = metaString ? `${msg} ${metaString}` : msg;
-
-    // Apply custom prefix and structure
-    return `[+] -- ${timestamp} -- [+] [${level}] -- ${fullMessage}`;
+const customFormat = winston.format.printf(({ level, message, timestamp, ...metadata }) => {
+  let msg = message;
+  // Handle potential objects in the message or metadata
+  if (typeof message === "object") {
+    msg = formatObject(message);
   }
-);
+
+  // Format additional metadata if it exists
+  const metaString = Object.keys(metadata).length ? formatObject(metadata) : "";
+
+  // Combine message and metadata
+  const fullMessage = metaString ? `${msg} ${metaString}` : msg;
+
+  // Apply custom prefix and structure
+  return `[+] -- ${timestamp} -- [+] [${level}] -- ${fullMessage}`;
+});
 
 // Create the logger instance
 const logger = winston.createLogger({
@@ -78,14 +75,11 @@ const logger = winston.createLogger({
       level: "info",
       handleExceptions: true,
       handleRejections: true,
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.prettyPrint()
-      )
+      format: winston.format.combine(winston.format.timestamp(), winston.format.prettyPrint()),
     }),
     new winston.transports.Console({
-      stderrLevels: ["error"] // Log errors to stderr
-    })
+      stderrLevels: ["error"], // Log errors to stderr
+    }),
 
     // -------------------------------------------------------------------------
     // Placeholder for External Log Aggregator Transports
@@ -117,7 +111,7 @@ const logger = winston.createLogger({
     // -------------------------------------------------------------------------
   ],
   // Do not exit on handled exceptions
-  exitOnError: false
+  exitOnError: false,
 });
 
 // Define an interface that extends the Logger type to include the morganStream property
@@ -125,14 +119,14 @@ interface MorganStreamLogger extends winston.Logger {
   morganStream: {
     write: (message: string) => void;
   };
-}  
+}
 
 // Add a stream interface for use with tools like morgan
 (logger as MorganStreamLogger).morganStream = {
   write: (message: string): void => {
     // Use http level for morgan logs
     logger.http(message.trim());
-  }
+  },
 };
 
 export default logger as MorganStreamLogger;
