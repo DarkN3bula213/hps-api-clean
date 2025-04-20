@@ -1,247 +1,48 @@
-name: API Gateway CI/CD
+name: Transfer Code to Server
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch: # Allows manual triggering
 
-# Required permissions for pushing to GHCR
-permissions:
-  contents: read
-  packages: write
+# No special permissions needed for just code transfer
+# permissions: ... (removed)
 
 jobs:
-  build_and_push:
-    name: Build and Push Docker Image
+  transfer_code: # Renamed from 'deploy'
+    name: Transfer Code to Hostinger VPS
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v3
-        with:
-          version: 8
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: |
-          if [ -f pnpm-lock.yaml ]; then
-            pnpm install --frozen-lockfile
-          else
-            pnpm install --no-frozen-lockfile
-          fi
-
-      - name: Build application
-        run: pnpm build # Verify TS compiles successfully
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ secrets.GHCR_USERNAME }}/api-gateway # Replace with your repo name if needed
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      # Upload docker-compose.yml for deployment job
-      - name: Archive docker-compose.yml
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-compose-file
-          path: docker-compose.yml
-
-  # --- Optional Test Job ---
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    needs: build_and_push # Can run in parallel, but might depend on build steps if integration testing
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v3
-        with:
-          version: 8
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Run tests
-        run: pnpm test
-
-  # --- Lint and Format Check Job ---
-  lint:
-    name: Lint and Format Check
-    runs-on: ubuntu-latest
-    needs: build_and_push # Can run in parallel
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v3
-        with:
-          version: 8
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Run linter
-        run: pnpm lint
-
-      - name: Check formatting
-        run: pnpm format:check
-
-  # --- Deployment Job ---
-  deploy:
-    name: Deploy to Hostinger
-    runs-on: ubuntu-latest
-    # Run only if build/push, test, and lint succeed, and it's a push to main or manually triggered
-    needs: [build_and_push, test, lint]
+    # Removed needs: [build_and_push, test, lint]
     if: (github.ref == 'refs/heads/main' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
 
     steps:
-      - name: Download docker-compose.yml
-        uses: actions/download-artifact@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          name: docker-compose-file
-          path: . # Download to current directory
+          fetch-depth: 0 # Fetch all history for accurate syncing if needed, though not strictly necessary for basic rsync
 
       - name: Setup SSH Key
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
 
-      # Make sure the host key is added to known_hosts
       - name: Add host key to known_hosts
         run: ssh-keyscan -H ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
 
-      # **** ADD THIS TEMPORARY STEP ****
-      - name: Test SSH Connection and Path
-        run: |
-          echo "Attempting SSH connection to ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}"
-          echo "Checking existence and permissions of path: ${{ secrets.HOSTINGER_APP_PATH }}"
-          ssh -o StrictHostKeyChecking=no ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }} 'echo "Connection successful! Listing target directory:" && ls -la ${{ secrets.HOSTINGER_APP_PATH }}'
-      # **** END OF TEMPORARY STEP ****
-      - name: Deploy and Restart Service
-        uses: appleboy/ssh-action@v1.0.3
-        id: deploy_script # Give the step an ID to check its outcome
-        with:
-          host: ${{ secrets.HOSTINGER_SSH_HOST }}
-          username: ${{ secrets.HOSTINGER_SSH_USER }}
-          key: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
-          script: |
-            set -e # Exit immediately if a command exits with a non-zero status.
-
-            APP_PATH="${{ secrets.HOSTINGER_APP_PATH }}"
-            BACKUP_DIR="${APP_PATH}/../backups" # Store backups one level up
-            BACKUP_FILE="backup-$(date +%Y%m%d%H%M%S).tar.gz"
-            IMAGE_NAME="ghcr.io/${{ secrets.GHCR_USERNAME }}/api-gateway:latest" # Replace if needed
-
-            echo "--- Starting Deployment ---"
-            cd $APP_PATH || exit 1 # Ensure we are in the app directory
-
-            # 1. Create Backup
-            echo "--- Creating Backup ---"
-            mkdir -p $BACKUP_DIR
-            # Backup only essential files like docker-compose.yml, .env if present
-            tar czf ${BACKUP_DIR}/${BACKUP_FILE} docker-compose.yml .env || echo "Backup created (ignoring tar exit code if .env doesn't exist)."
-            echo "Backup created at ${BACKUP_DIR}/${BACKUP_FILE}"
-
-            # 2. Update docker-compose.yml (copied from artifact below)
-            echo "--- Updating docker-compose.yml ---"
-            # The file will be copied by the next step
-
-            # 3. Pull latest image
-            echo "--- Pulling Docker Image: ${IMAGE_NAME} ---"
-            docker pull $IMAGE_NAME
-
-            # 4. Take down current containers
-            echo "--- Stopping Current Containers ---"
-            docker-compose down
-
-            # 5. Restart containers with new image
-            echo "--- Starting New Containers ---"
-            docker-compose up -d --remove-orphans
-
-            # 6. Basic Health Check (wait a few seconds for service to start)
-            echo "--- Performing Health Check ---"
-            sleep 10 # Adjust as needed
-            # Replace '/health' with your actual health check endpoint if you have one
-            # curl --fail http://localhost:3000/health || (echo "Health check failed!" && exit 1)
-            echo "--- Deployment Successful ---"
-
-      # This step copies the docker-compose.yml downloaded from the artifact
-      - name: Copy docker-compose.yml to server
-        if: always() # Run even if previous steps fail, to potentially aid rollback
-        run: |
-          scp -o StrictHostKeyChecking=no ./docker-compose.yml ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:${{ secrets.HOSTINGER_APP_PATH }}/docker-compose.yml
-
-      - name: Rollback on Failure
-        # Run if the deploy_script step failed
-        if: steps.deploy_script.outcome == 'failure'
+      - name: Ensure target directory exists on server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.HOSTINGER_SSH_HOST }}
           username: ${{ secrets.HOSTINGER_SSH_USER }}
           key: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
           script: |
-            set -e
-            echo "!!! Deployment Failed - Rolling Back !!!"
-            APP_PATH="${{ secrets.HOSTINGER_APP_PATH }}"
-            BACKUP_DIR="${APP_PATH}/../backups"
+            echo "Ensuring directory exists: ${{ secrets.HOSTINGER_APP_PATH }}"
+            mkdir -p ${{ secrets.HOSTINGER_APP_PATH }}
 
-            # Find the latest backup
-            LATEST_BACKUP=$(ls -t ${BACKUP_DIR}/backup-*.tar.gz | head -n 1)
-            if [ -z "$LATEST_BACKUP" ]; then
-              echo "Error: No backup found to restore!"
-              exit 1
-            fi
-            echo "Restoring from ${LATEST_BACKUP}"
+      - name: Sync files to server via rsync
+        run: |
+          echo "Syncing files from $(pwd) to ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:${{ secrets.HOSTINGER_APP_PATH }}/"
+          rsync -avzr --delete --exclude='.git/' --exclude='.github/' --exclude='node_modules/' -e "ssh -o StrictHostKeyChecking=no -p ${{ secrets.HOSTINGER_SSH_PORT || 22 }}" ./ ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:${{ secrets.HOSTINGER_APP_PATH }}/
+          echo "Sync complete."
 
-            cd $APP_PATH || exit 1
-
-            # Stop potentially broken containers
-            docker-compose down || echo "Ignoring docker-compose down failure during rollback"
-
-            # Restore files from backup
-            tar xzf $LATEST_BACKUP -C .
-
-            # Restart with the restored configuration (should use the previous image tag)
-            echo "Restarting previous version..."
-            docker-compose up -d
-            echo "!!! Rollback Complete !!!"
-            exit 1 # Ensure the overall workflow status is failure
+      # Removed artifact download, deploy script, compose copy, and rollback steps
