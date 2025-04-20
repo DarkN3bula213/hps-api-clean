@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  api-gateway:
+    build: .
+    container_name: api-gateway-service
+    ports:
+      # Map host port 8080 to container port 3000
+      - "8080:3000"
+    environment:
+      NODE_ENV: production
+      # You can override the default port from the Dockerfile here
+      # PORT: 3001
+    # Uncomment the following lines if you want to use a .env file
+    # env_file:
+    #   - .env
+    restart: unless-stopped

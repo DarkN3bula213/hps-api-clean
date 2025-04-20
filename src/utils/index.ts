@@ -1,5 +1,5 @@
 
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 
 export type MiddlewareFunction = (
   req: Request,
@@ -7,7 +7,7 @@ export type MiddlewareFunction = (
   next: NextFunction
 ) => Promise<void> | void;
 
-export type MiddlewareFactory = (options?: any) => MiddlewareFunction;
+export type MiddlewareFactory = (options?: unknown) => MiddlewareFunction;
 
 export interface MiddlewareError extends Error {
   statusCode?: number;
