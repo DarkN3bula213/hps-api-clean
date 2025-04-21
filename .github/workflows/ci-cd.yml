@@ -15,10 +15,18 @@ jobs:
 
       - name: Setup SSH key
         run: |
+          mkdir -p ~/.ssh # Ensure the .ssh directory exists
           echo "${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           eval "$(ssh-agent -s)"
           ssh-add ~/.ssh/id_rsa
+
+      - name: Validate SSH Key Secret
+        run: |
+          if [ -z "${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}" ]; then
+            echo "Error: HOSTINGER_SSH_PRIVATE_KEY secret is not set or empty."
+            exit 1
+          fi
 
       - name: Add host key to known_hosts
         run: ssh-keyscan -H ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
