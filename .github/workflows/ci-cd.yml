@@ -1,60 +1,9 @@
-name: Transfer Code to Server
+name: Transfer Code to Server via SSH
 
 on:
   push:
     branches: [main]
   workflow_dispatch: # Allows manual triggering
-
-# # No special permissions needed for just code transfer
-# # permissions: ... (removed)
-
-# jobs:
-#   transfer_code: # Renamed from 'deploy'
-#     name: Transfer Code to Hostinger VPS
-#     runs-on: ubuntu-latest
-#     # Removed needs: [build_and_push, test, lint]
-#     if: (github.ref == 'refs/heads/main' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
-
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-#         with:
-#           fetch-depth: 0 # Fetch all history for accurate syncing if needed, though not strictly necessary for basic rsync
-
-#       - name: Setup SSH Key
-#         run: |
-#           echo "${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-#           chmod 600 ~/.ssh/id_rsa
-#           eval "$(ssh-agent -s)"
-#           ssh-add ~/.ssh/id_rsa
-
-#       - name: Add host key to known_hosts
-#         run: ssh-keyscan -H ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
-
-#       - name: Ensure target directory exists on server
-#         uses: appleboy/ssh-action@v1.0.3
-#         with:
-#           host: ${{ secrets.HOSTINGER_SSH_HOST }}
-#           username: ${{ secrets.HOSTINGER_SSH_USER }}
-#           key: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
-#           script: |
-#             echo "Ensuring directory exists: ${{ secrets.HOSTINGER_APP_PATH }}"
-#             mkdir -p ${{ secrets.HOSTINGER_APP_PATH }}
-
-#       - name: Sync files to server via rsync
-#         run: |
-#           echo "Syncing files from $(pwd) to ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:${{ secrets.HOSTINGER_APP_PATH }}/"
-#           rsync -avzr --delete --exclude='.git/' --exclude='.github/' --exclude='node_modules/' -e "ssh -o StrictHostKeyChecking=no -p ${{ secrets.HOSTINGER_SSH_PORT || 22 }}" ./ ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:${{ secrets.HOSTINGER_APP_PATH }}/
-#           echo "Sync complete."
-
-#       # Removed artifact download, deploy script, compose copy, and rollback steps
-
-# name: Check and copy files to Hostinger
-
-# on:
-#   push:
-#     branches:
-#       - version/hostinger
 
 jobs:
   deploy:
@@ -65,36 +14,35 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup SSH key
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
-          known_hosts: ${{ secrets.HOSTINGER_SSH_HOST }}
-          if_key_exists: replace
+        run: |
+          echo "${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Add host key to known_hosts
+        run: ssh-keyscan -H ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Test SSH Connection
         run: |
-          ssh -v -o StrictHostKeyChecking=no ${{ secrets.GHCR_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} "echo 'Connection test successful'"
+          ssh -o StrictHostKeyChecking=no ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }} "echo 'Connection test successful'"
 
       - name: Check destination directory permissions
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }} '
-            ls -la /var/www/
             mkdir -p /var/www/hps
             chmod 755 /var/www/hps
           '
 
-      - name: Deploy with rsync (verbose)
+      - name: Deploy with rsync
         run: |
-          eval $(ssh-agent -s)
-          ssh-add - <<< "${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}"
-          rsync -avvz --progress -e "ssh -v -o StrictHostKeyChecking=no" \
+          rsync -avvz --progress -e "ssh -o StrictHostKeyChecking=no" \
             --exclude '.git*' \
             --exclude 'node_modules' \
             --exclude 'test' \
             --exclude '.env' \
             --exclude 'logs' \
-            --exclude 'dist' \
-            ./ ${{ secrets.GHCR_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }}:/var/www/hps/
+            ./ ${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:/var/www/hps/
 
       - name: Verify files
         if: success()
